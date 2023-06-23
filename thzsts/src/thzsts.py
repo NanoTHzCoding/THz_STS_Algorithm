@@ -6,8 +6,6 @@ from sklearn import linear_model
 from sklearn.model_selection import ShuffleSplit
 from sklearn.metrics import mean_squared_error
 
-# All the function used for performing the inversion algorithm and the waveform validation
-
 def inversion_algorithm_splits(wf, qe, p_order, splits, train_test_ratio, rand_seed=2237, mse_metrics=False):
     """Main function to perform extraction algorithm using shuffle splits."""
 
@@ -137,8 +135,6 @@ def rectify_QE(wf, iv, bias=0):
         sim_qe[1, i] = integrate.simps(y=ITHz, x=wf[0])
         
     return sim_qe, sim_it
-
-
 
 def generate_cc_waveforms(wf_stat, wf_probe, cc_delay):
     '''Generate overlapping waveform for stationary and probe pulse with each cc time delay.'''

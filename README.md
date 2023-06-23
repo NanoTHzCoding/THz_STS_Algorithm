@@ -6,13 +6,13 @@ A compilation of functions to perform the steady-state terahertz scanning tunnel
 Run the following to install
 
 ```python
-pip install thz-sts-algorithm
+pip install thzsts
 ```
 
 ## Usage
 
 ```python
-from thz-sts-algorithm import 
+from thzsts import algorithm
 
 ...
 
