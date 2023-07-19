@@ -5,14 +5,15 @@ from sklearn.preprocessing import PolynomialFeatures
 from sklearn import linear_model
 from sklearn.model_selection import ShuffleSplit
 from sklearn.metrics import mean_squared_error
+from scipy.optimize import curve_fit
 
-def inversion_algorithm_splits(wf, qe, p_order, splits, train_test_ratio, rand_seed=2237, mse_metrics=False):
+def inversion_algorithm_splits(wf, qe, p_order, splits, train_test_ratio, rand_seed=2237, mse_metrics=False, method="linreg"):
     """Main function to perform extraction algorithm using shuffle splits."""
 
     # Calculate Coefficient (ref. Algorithm paper)
     Bn = calculate_Bn(wf, p_order)   # calculate waveform integral up to order p
     Cn, test_loss_avg, test_loss_std, train_loss_avg, train_loss_std, fit_qe, mse_qe_fit = shuffle_splits_fit(
-        qe, p_order, splits, train_test_ratio, rand_seed)
+        qe, p_order, splits, train_test_ratio, rand_seed, method)
     
     ext_didv = 0
     ext_iv = 0
@@ -50,16 +51,24 @@ def calculate_Bn(wf, p_order):
         Bn[i] = np.real(integrate.simps(y=wf[1]**(i+2),x=wf[0]))        
     return Bn
 
-def shuffle_splits_fit(qe, p_order, splits, train_test_ratio, rand_seed):
+def poly_f(x, *params):
+    """Polynomial fit function to fit QE curve via curvefit."""
+    return sum([p*(x**(i+2)) for i, p in enumerate(params)])
+
+def shuffle_splits_fit(qe, p_order, splits, train_test_ratio, rand_seed, method="linreg"):
     """Perform inversion with shuffle split fit."""
     
-    # Make a design matrix with polynomial features
-    # start with quadratic term (constant term not included)
-    poly = PolynomialFeatures((2, p_order), include_bias=False)   
-    DM = poly.fit_transform(np.reshape(qe[0], (qe[0].size, 1)))  # qe needs specific shape
+    # Two methods for the polynomial model, curvfit from scipy and linear regession & polynomial 
+    # features from scikit learn library
     
-    # set up fit model for fit
-    lin_mod = linear_model.LinearRegression
+    if method == "linreg":
+        # Make a design matrix with polynomial features
+        # start with quadratic term (constant term not included)
+        poly = PolynomialFeatures((2, p_order), include_bias=False)   
+        DM = poly.fit_transform(np.reshape(qe[0], (qe[0].size, 1)))  # qe needs specific shape
+
+        # set up fit model for fit
+        lin_mod = linear_model.LinearRegression
 
     # set up shuffle split sampling with given parameters, if random_state None different every time
     shuffle = ShuffleSplit(splits, test_size=train_test_ratio, random_state=rand_seed)
@@ -75,17 +84,41 @@ def shuffle_splits_fit(qe, p_order, splits, train_test_ratio, rand_seed):
     # loop through split sets
     for train, test in shuffle.split(qe.T):
         
-        # fit the polynomial model to the training data without an intercept (zero crossing at zero)
-        reg = lin_mod(fit_intercept=False).fit(DM[train], q[train])
-        # predict the QE curve for the test data with the fit model from the train data
-        pred_q_test = reg.predict(DM[test])
-        pred_q_train = reg.predict(DM[train])
-        
-        # calculate the mean squared error loss between the predicte Q from the train data and the actual Q
-        test_losses[idx] = mean_squared_error(pred_q_test, q[test])
-        train_losses[idx] = mean_squared_error(pred_q_train, q[train])
-        # get fit coefficients from linear regression model  
-        coeffs[idx, :] = reg.coef_
+        if method == "linreg":        
+            # fit the polynomial model to the training data without an intercept (zero crossing at zero)
+            reg = lin_mod(fit_intercept=False).fit(DM[train], q[train])
+            # predict the QE curve for the test data with the fit model from the train data
+            pred_q_test = reg.predict(DM[test])
+            pred_q_train = reg.predict(DM[train])
+
+            # calculate the mean squared error loss between the predicte Q from the train data and the actual Q
+            test_losses[idx] = mean_squared_error(pred_q_test, q[test])
+            train_losses[idx] = mean_squared_error(pred_q_train, q[train])
+            # get fit coefficients from linear regression model  
+            coeffs[idx, :] = reg.coef_
+            
+        elif method == "curvefit":
+            # create arrays from shuffle split indeces for train and test
+            qe_train = np.take(qe, train, axis=1)
+            qe_test = np.take(qe, test, axis=1)
+
+            # fit the QE curve via scipy curve fit usind poly_f function.
+            Cn_raw,_ = curve_fit(f=poly_f,xdata=qe_train[0],ydata=qe_train[1],p0=[0]*(p_order-1))
+
+            # predict test and train data
+            pred_q_test = poly_f(qe_test[0], *Cn_raw)
+            pred_q_train = poly_f(qe_train[0], *Cn_raw)
+
+            # calculate the mean squared error loss between the predicte Q from the train data and the actual Q
+            test_losses[idx] = mean_squared_error(pred_q_test, qe_test[1])
+            train_losses[idx] = mean_squared_error(pred_q_train, qe_train[1])
+
+            # assign fit coefficients
+            coeffs[idx, :] = Cn_raw
+            
+        else:
+            print("Choose curvefit or linreg as fit methods.")
+            
         idx += 1
         
     # calculate loss outputs
@@ -98,7 +131,11 @@ def shuffle_splits_fit(qe, p_order, splits, train_test_ratio, rand_seed):
     Cn = np.mean(coeffs, axis=0)
     
     # calculate the fitted QE curve
-    fit_qe = np.dot(DM, Cn)
+    if method == "linreg":
+        fit_qe = np.dot(DM, Cn)
+    elif method == "curvefit":
+        fit_qe = poly_f(qe[0], *Cn)
+        
     fit_qe = np.vstack((qe[0], fit_qe))
     
     # calculate more error statistics
