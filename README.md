@@ -16,7 +16,7 @@ $$Q_\mathrm{THz}= \int_{-\infty}^{+\infty} I(V_\mathrm{THz}(t))dt$$
 
 To study physical phenomena, we want to investigate features in the $I(V)$ curve. The goal of the inversion algorithm is to extract the $I(V)$ curve from the $Q(E)$ curve using the shape of the ingoing THz waveform. Mathematically, we can express the waveform as $V_\mathrm{THz}=V_\mathrm{pk}V_0(t)$ where $V_0(t)$ describes the temporal normalized shape and $V_\mathrm{pk}$ describes the scaling factor of the waveform that scales linearly with the THz field strength. 
 
-To entangle the integral above, we approximate the $I(V)$ curve with a polynomial of order N. $I(V)=\sum_{n=1}^N A_n V^n$ where $A_n$ are constant coefficients.
+To entangle the integral above, we approximate the $I(V)$ curve with a polynomial of order N. $I(V)=\sum\limits_{n=1}^{N} A_n V^n$ where $A_n$ are constant coefficients.
 
 Plugging the approximation and the mathematical description of the waveform into the integral for $Q_\mathrm{THz}$ yields
 $$Q_\mathrm{THz}(V_{pk})= \int_{-\infty}^{+\infty}  \sum_{n=1}^N A_n (V_\mathrm{pk}V_0(t))^n dt = \sum_{n=1}^N A_n V_\mathrm{pk}^n \int_{-\infty}^{+\infty} V_0(t)^n dt \equiv \sum_{n=1}^N A_n V_\mathrm{pk}^n B_n$$
@@ -25,7 +25,7 @@ $B_n$ is the remaining integral after applying the approximation. If we know the
 
 We have to determine the coefficients $A_n$ to extract the $I(V)$ curve. This is possible by determining the voltage calibration factor $\alpha$ which converts $V_\mathrm{pk}=\alpha E_\mathrm{THz}$ and fitting our $Q_\mathrm{THz}(V_{pk}=\alpha E_\mathrm{THz})$ data to the equation above. With this we know all other terms in the equation besides $A_n$.
 
-To make the fitting process as straight forward as possible we can simplify the fit equation to $$Q_\mathrm{THz} (V_\mathrm{pk}) = \sum^{p_\mathrm{max}}_{p=2} C_p V_\mathrm{pk}^p$$.
+To make the fitting process as straight forward as possible we can simplify the fit equation to $Q_\mathrm{THz} (V_\mathrm{pk}) = \sum\limits_{p=2}^{p_\mathrm{max}} C_p V_\mathrm{pk}^p$.
 For fitting a polynomial sum to some input datapoints we can choose from various python libraries and functions.
 
 Note that, we cannot determine the linear term of the $I(V)$ curve because  $B_1=\int_{-\infty}^{+\infty} V_0(t) dt = 0$.
