@@ -1,10 +1,10 @@
 # THz-STS-Algorithm
-A compilation of functions to perform the steady-state terahertz scanning tunneling spectroscopy (THz-STS) algorithm described in *Ammerman, S. E., et al.,  Algorithm for subcycle
-terahertz scanning tunneling spectroscopy. Phys. Rev. B 105, 115427 (2022)* and functions to simulate the THz-CC measurement and determine a true waveform as described in the paper with the DOI attached to this repository.
+This repository contains a compilation of functions to perform the steady-state terahertz scanning tunneling spectroscopy (THz-STS) algorithm described in *Ammerman, S. E., et al.,  Algorithm for subcycle
+terahertz scanning tunneling spectroscopy. Phys. Rev. B 105, 115427 (2022)* and functions to simulate the THz-CC measurement and determine a true waveform as described in *Jelic, V., et al.,  Atomic-scale terahertz time-domain spectroscopy. Nat. Photonics (2024)*. 
 
 ## Documentation
 
-All functions explained here can be found in the *thzsts.py* script. To use the functions in a jupyter notebook, you can place a copy of the script in the same folder and insert the import statement e.g. ```import thzsts as f```. See the jupyter notebook *example.ipynb* for a demonstration with real data from figure 2 of the paper.
+All functions explained here can be found in the *thzsts.py* script. To use the functions in a jupyter notebook, you can place a copy of the script in the same folder and insert the import statement e.g. ```import thzsts as f```. See the jupyter notebook *example.ipynb* for a demonstration with real data from *Jelic, V., et al.,  Atomic-scale terahertz time-domain spectroscopy. Nat. Photonics (2024)* (Fig. 2 and Ext. Fig. 2).
 
 ### 1.1 Theory behind the inversion algorithm
 
