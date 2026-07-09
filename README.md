@@ -3,7 +3,7 @@ This repository contains a compilation of functions to perform the steady-state 
 terahertz scanning tunneling spectroscopy. Phys. Rev. B 105, 115427 (2022)* and functions to simulate the THz-CC measurement and determine a true waveform as described in *Jelic, V., et al.,  Atomic-scale terahertz time-domain spectroscopy. Nat. Photonics (2024)*. 
 
 Update July 2026:
-Two new function with an optimized fitting method (stratified shuffle split cross fitting) have been added. These functions were used in the analysis shown in 'S. Adams, et al., Control and Validation of Terahertz Near-Fields for Atomic-Scale Time-Domain Spectroscopy," IEEE Transactions on Terahertz Science and Technology (2026).'.
+Two new functions with an optimized fitting method (stratified shuffle split cross fitting) have been added. These functions were used in the analysis shown in 'S. Adams, et al., Control and Validation of Terahertz Near-Fields for Atomic-Scale Time-Domain Spectroscopy," IEEE Transactions on Terahertz Science and Technology (2026).'.
 
 ## Documentation
 
