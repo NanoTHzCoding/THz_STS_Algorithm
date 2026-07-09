@@ -4,6 +4,7 @@ from scipy.interpolate import interp1d
 from sklearn.preprocessing import PolynomialFeatures
 from sklearn import linear_model
 from sklearn.model_selection import ShuffleSplit
+from sklearn.model_selection import StratifiedShuffleSplit
 from sklearn.metrics import mean_squared_error
 from scipy.optimize import curve_fit
 
@@ -239,3 +240,128 @@ def simulate_Thz_CC(wf, efield, ext_iv, probe_size=0.05, t_min=-5, t_max=5, dela
     thz_cc_sim = np.vstack((cc_delay, thz_cc_wf)) 
     
     return thz_cc_sim
+
+###############################################################################
+####### New function for stratified shuffle split fitting #####################
+###############################################################################
+
+def scale_train_test(qe_train, qe_test):
+    """Scale by train mean for numerical stability."""
+    mean_train = np.mean(qe_train)
+    scale = np.max(np.abs(qe_train - mean_train))
+    if scale == 0:
+        scale = 1.0
+    return (qe_train - mean_train) / scale, (qe_test - mean_train) / scale
+
+def scale_x(qe, qe_train, qe_test):
+    """Scale by train mean for numerical stability."""
+    scale = np.max(np.abs(qe))
+    if scale == 0:
+        scale = 1.0
+    return qe / scale, qe_train / scale, qe_test / scale
+
+
+def stratified_shuffle_splits_fit(qe, p_order, splits=100, bins=12, train_test_ratio=0.2, rand_seed=0):
+    """Perform inversion with stratified shuffle split fit and curvefit.
+    Stratified indices by binning x, so train/test have similar x-coverage. 
+    First group samples into x-bins, then split so each bin is represented in both train and test."""
+   
+    # set up shuffle split sampling with given parameters, if random_state None different every time
+    x = np.asarray(qe[0]).ravel()
+    y = np.asarray(qe[1]).ravel()
+    # ensure unique strictly increaing edges
+    edges = np.unique(np.quantile(x, np.linspace(0, 1, bins + 1)))
+    
+    # labels 0..n_bins-1
+    y_bins = np.digitize(x, edges[1:-1])
+    
+    strat_shuffle = StratifiedShuffleSplit(n_splits=splits, test_size=train_test_ratio,
+                                           random_state=rand_seed)
+    
+    # array to hold errors between train and test data sets
+    test_losses = np.zeros(splits)
+    train_losses = np.zeros(splits)
+    # array to hold coefficients for polynomial terms
+    coeffs = np.zeros((splits, p_order-1))
+    
+    idx = 0
+    # loop through split sets
+    for train, test in list(strat_shuffle.split(x, y_bins)):
+            
+        # create arrays from shuffle split indeces for train and test
+        x_train, y_train = x[train], y[train]
+        x_test, y_test = x[test], y[test]
+        
+        # scale x to -1 to +1 for better numerical stability
+        x_scaled, x_train_scaled, x_test_scaled = scale_x(x, x_train, x_test)
+
+        # fit the QE curve via scipy curve fit usind poly_f function.
+        Cn_raw,_ = curve_fit(f=poly_f,xdata=x_train_scaled, ydata=y_train, p0=[0]*(p_order-1))
+        
+        # predict test and train data
+        pred_q_test = poly_f(x_test_scaled, *Cn_raw)
+        pred_q_train = poly_f(x_train_scaled, *Cn_raw)
+
+        # calculate the mean squared error loss between the predicte Q from the train data and the actual Q
+        test_losses[idx] = np.mean((y_test - pred_q_test) ** 2)
+        train_losses[idx] = np.mean((y_train - pred_q_train) ** 2)
+
+        # assign fit coefficients
+        coeffs[idx, :] = Cn_raw
+            
+        idx += 1
+        
+    # calculate loss outputs
+    test_loss_avg = np.mean(test_losses)
+    test_loss_std = np.std(test_losses)
+    train_loss_avg = np.mean(train_losses)
+    train_loss_std = np.std(train_losses)
+    
+    # calculate the mean value for all coefficients over all splits
+    Cn = np.mean(coeffs, axis=0)
+    
+    # calculate the fitted QE curve
+    fit_qe = poly_f(x_scaled, *Cn)      
+    fit_qe = np.vstack((qe[0], fit_qe))
+    
+    # calculate more error statistics
+    mse_qe_fit = mean_squared_error(qe[1], fit_qe[1])
+    
+    return Cn, x_scaled, test_loss_avg, test_loss_std, train_loss_avg, train_loss_std, fit_qe, mse_qe_fit
+
+def inversion_algorithm_strat_splits(wf, qe, p_order, splits=100, bins=12, train_test_ratio=0.2, rand_seed=0, mse_metrics=False):
+    """Main function to perform extraction algorithm using stratified shuffle splits."""
+
+    # Calculate Coefficient (ref. Algorithm paper)
+    Bn = calculate_Bn(wf, p_order)   # calculate waveform integral up to order p
+    Cn, x_scaled, test_loss_avg, test_loss_std, train_loss_avg, train_loss_std, fit_qe, mse_qe_fit = stratified_shuffle_splits_fit(
+        qe, p_order, splits, bins, train_test_ratio, rand_seed)
+    
+    ext_didv = 0
+    ext_iv = 0
+    # loop to calculate An (polynomial prefactors for the IV and dIdV curves)
+    for i in range(len(Cn)):
+        # calculate An
+        An = Cn[i] / Bn[i]
+        # add contributions to recovered didv
+        ext_didv += (i+2)*An*x_scaled**(i-1+2)
+        ext_iv += An*x_scaled**(i+2)
+
+    # make I(E) and dIdE two column matrices 
+    ext_didv = np.vstack((qe[0], ext_didv))
+    ext_iv = np.vstack((qe[0], ext_iv))
+
+    # calculate current pulses i(t) and and simulate the qe measurement 
+    sim_qe, sim_it = rectify_QE(wf, ext_iv)
+    
+    # if interpolation range out of range set error to nan
+    try:
+        mse_qe_sim = mean_squared_error(qe[1], sim_qe[1])
+    except:
+        mse_qe_sim = np.nan
+    
+    if mse_metrics is True:
+        return (ext_iv, ext_didv, fit_qe, sim_qe, sim_it, test_loss_avg, test_loss_std, 
+               train_loss_avg, train_loss_std, mse_qe_fit, mse_qe_sim)
+    else:
+        return ext_iv, ext_didv, fit_qe, sim_qe, sim_it
